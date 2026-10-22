@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pig Counter — Đếm heo tự động</title>
+<link rel="icon" type="image/png" href="/static/img/pig-icon.png">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div class="app-layout">
+
+  <!-- ===================== SIDEBAR TRÁI ===================== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="/static/img/pig-icon.png" alt="logo" class="brand-logo">
+      <div class="brand-text">
+        <h1>PIG COUNTER</h1>
+        <span>Đếm heo tự động · AI</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle" title="Thu gọn / mở rộng menu">◀</button>
+    </div>
+
+    <div class="sidebar-status" id="topbarStatus">
+      <span class="dot dot-idle"></span> <span class="status-text">Chưa có phiên đếm</span>
+    </div>
+
+    <div class="sidebar-section-label">Nguồn video</div>
+    <nav class="sidebar-nav">
+      <button class="side-nav-btn tab-btn active" data-tab="upload" title="Tải video lên">
+        <span class="side-nav-icon side-nav-icon-1">🎞️</span>
+        <span class="side-nav-text">Tải video lên</span>
+      </button>
+      <button class="side-nav-btn tab-btn" data-tab="rtsp" title="Camera RTSP">
+        <span class="side-nav-icon side-nav-icon-2">📡</span>
+        <span class="side-nav-text">Camera RTSP</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-section-label">Tiến trình</div>
+    <nav class="sidebar-steps" id="stepNav">
+      <button class="side-step active" id="pillSource" data-step="source" title="Chọn nguồn video">
+        <span class="side-step-num">1</span>
+        <span class="side-step-text">Chọn nguồn video</span>
+      </button>
+      <span class="side-step-line" id="lineA"></span>
+      <button class="side-step" id="pillDraw" data-step="draw" disabled title="Vẽ vùng đếm">
+        <span class="side-step-num">2</span>
+        <span class="side-step-text">Vẽ vùng đếm</span>
+      </button>
+      <span class="side-step-line" id="lineB"></span>
+      <button class="side-step" id="pillRun" data-step="run" disabled title="Đang đếm">
+        <span class="side-step-num">3</span>
+        <span class="side-step-text">Đang đếm</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-spacer"></div>
+
+    <button class="btn btn-exit" id="shutdownBtn" title="Tắt hẳn ứng dụng Pig Counter">
+      <span class="power-icon">⏻</span> <span class="side-nav-text">Thoát ứng dụng</span>
+    </button>
+  </aside>
+
+  <!-- ===================== KHU VỰC NỘI DUNG CHÍNH ===================== -->
+  <div class="main-area">
+  <main class="app-shell">
+
+  <!-- ===================== BƯỚC 1: CHỌN NGUỒN ===================== -->
+  <section id="sourceSection" class="panel panel-anim">
+    <h2 class="panel-title"><span class="step-num">1</span> Chọn nguồn video</h2>
+
+    <div class="tab-panel" id="tabUpload">
+      <label class="dropzone" id="dropzone">
+        <input type="file" id="videoInput" accept="video/*" hidden>
+        <div class="dropzone-icon">🎞️</div>
+        <div><strong>Kéo thả video vào đây</strong> hoặc bấm để chọn file</div>
+        <div class="hint">Hỗ trợ mp4, avi, mov, mkv, wmv…</div>
+      </label>
+      <div id="uploadProgress" class="progress-row hidden">
+        <div class="progress-track"><div class="progress-fill" id="uploadFill"></div></div>
+        <span id="uploadPct">0%</span>
+      </div>
+    </div>
+
+    <div class="tab-panel hidden" id="tabRtsp">
+      <div class="rtsp-form">
+        <input type="text" id="rtspUrl" placeholder="rtsp://user:pass@192.168.1.100:554/stream1">
+        <button id="rtspConnectBtn" class="btn btn-primary">Kết nối</button>
+      </div>
+    </div>
+
+    <div id="sourceError" class="error-box hidden"></div>
+  </section>
+
+  <!-- ===================== BƯỚC 2: VẼ VÙNG ĐẾM ===================== -->
+  <section id="drawSection" class="panel panel-anim hidden">
+    <div class="panel-title-row">
+      <h2 class="panel-title"><span class="step-num">2</span> Vẽ vùng đếm (vẽ tay trên khung hình thật)</h2>
+    </div>
+
+    <div class="draw-tools">
+      <button class="tool-btn active" data-mode="chamber">
+        <span class="swatch swatch-red"></span> Vùng chuồng (ROI)
+      </button>
+      <button class="tool-btn" data-mode="green">
+        <span class="swatch swatch-green"></span> Cổng vào
+      </button>
+      <button class="tool-btn" data-mode="pink">
+        <span class="swatch swatch-pink"></span> Cổng ra
+      </button>
+      <div class="tool-spacer"></div>
+      <button class="btn btn-ghost" id="undoPointBtn">Hoàn tác điểm</button>
+      <button class="btn btn-ghost" id="clearAllBtn">Xoá hết</button>
+    </div>
+
+    <div class="draw-instructions" id="drawInstructions">
+      Nhấp chuột để thêm điểm cho <b>vùng chuồng (ROI)</b>. Cần tối thiểu 3 điểm, nhấp vào điểm đầu tiên (hoặc bấm "Đóng vùng") để khép kín đa giác.
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="drawCanvas"></canvas>
+    </div>
+
+    <div class="draw-footer">
+      <div class="draw-status" id="drawStatus">
+        <span id="statChamber">ROI: chưa vẽ</span>
+        <span id="statGreen">Cổng vào: chưa vẽ</span>
+        <span id="statPink">Cổng ra: chưa vẽ</span>
+      </div>
+      <div class="draw-actions">
+        <button class="btn btn-ghost" id="closePolygonBtn">Đóng vùng ROI</button>
+        <button class="btn btn-primary" id="startCountBtn" disabled>Bắt đầu đếm ▶</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== BƯỚC 3: ĐANG ĐẾM / KẾT QUẢ ===================== -->
+  <section id="runSection" class="panel panel-anim hidden">
+    <div class="panel-title-row">
+      <h2 class="panel-title"><span class="step-num">3</span> Đang đếm</h2>
+    </div>
+
+    <div class="run-layout">
+      <div class="video-col">
+        <div class="video-frame">
+          <img id="streamImg" alt="live stream">
+          <button class="gear-btn" id="settingsBtn" title="Chỉnh lại vùng vẽ">⚙️</button>
+        </div>
+        <div class="run-controls">
+          <button class="btn btn-danger-ghost" id="stopBtn">⏹ Dừng phiên đếm này</button>
+          <button class="btn btn-primary hidden" id="changeSourceBtn">🔁 Đổi video / nguồn khác</button>
+          <span class="live-badge" id="liveBadge">● TRỰC TIẾP</span>
+        </div>
+      </div>
+
+      <aside class="stats-col">
+        <div class="stat-cards">
+          <div class="stat-card stat-card-1">
+            <div class="stat-label">Lượt hiện tại</div>
+            <div class="stat-value" id="statBatchNo">1</div>
+          </div>
+          <div class="stat-card stat-card-2">
+            <div class="stat-label">Heo trong chuồng</div>
+            <div class="stat-value" id="statInChamber">0</div>
+          </div>
+          <div class="stat-card highlight">
+            <div class="stat-label">Tổng số heo đã đếm</div>
+            <div class="stat-value" id="statTotalPigs">0</div>
+          </div>
+        </div>
+
+        <div class="mode-line" id="modeLine">Chế độ: đang khởi động…</div>
+
+        <h3 class="table-title">Thống kê theo đợt</h3>
+        <div class="table-wrap">
+          <table class="batch-table">
+            <thead>
+              <tr><th>Lượt</th><th>Cổng chốt</th><th>Số heo</th><th>Thời lượng</th></tr>
+            </thead>
+            <tbody id="batchTableBody">
+            </tbody>
+          </table>
+        </div>
+
+        <div class="download-row hidden" id="downloadRow">
+          <a class="btn btn-ghost" id="dlVideo" download>⬇ Video kết quả</a>
+          <a class="btn btn-ghost" id="dlBatches" download>⬇ CSV lượt</a>
+          <a class="btn btn-ghost" id="dlEvents" download>⬇ CSV sự kiện</a>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  </main>
+  </div>
+
+</div>
+
+<!-- ===================== OVERLAY: CHỈNH LẠI VÙNG VẼ ===================== -->
+<div id="redrawOverlay" class="overlay hidden">
+  <div class="overlay-panel">
+    <h2 class="panel-title">Chỉnh lại vùng vẽ</h2>
+    <p class="confirm-text">
+      Vùng đã vẽ trước đó được tự động điền lại. Chọn đúng phần cần sửa bên dưới rồi bấm
+      <b>"Xoá riêng phần này"</b> để vẽ lại — không cần vẽ lại từ đầu cả 3 phần.
+    </p>
+    <div class="draw-tools">
+      <button class="tool-btn active" data-mode2="chamber">
+        <span class="swatch swatch-red"></span> Vùng chuồng (ROI)
+      </button>
+      <button class="tool-btn" data-mode2="green">
+        <span class="swatch swatch-green"></span> Cổng vào
+      </button>
+      <button class="tool-btn" data-mode2="pink">
+        <span class="swatch swatch-pink"></span> Cổng ra
+      </button>
+      <div class="tool-spacer"></div>
+      <button class="btn btn-ghost" id="undoPointBtn2">Hoàn tác điểm</button>
+      <button class="btn btn-ghost" id="clearOneBtn2">Xoá riêng phần này</button>
+      <button class="btn btn-danger-ghost" id="clearAllBtn2">Xoá tất cả, vẽ lại từ đầu</button>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="redrawCanvas"></canvas>
+    </div>
+    <div class="draw-footer">
+      <button class="btn btn-ghost" id="closePolygonBtn2">Đóng vùng ROI</button>
+      <div class="tool-spacer"></div>
+      <button class="btn btn-ghost" id="cancelRedrawBtn">Huỷ</button>
+      <button class="btn btn-primary" id="applyRedrawBtn">Áp dụng & Tiếp tục</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== OVERLAY: XÁC NHẬN DỪNG ỨNG DỤNG ===================== -->
+<div id="shutdownConfirmOverlay" class="overlay hidden">
+  <div class="overlay-panel overlay-panel-small">
+    <h2 class="panel-title">⏻ Dừng ứng dụng Pig Counter?</h2>
+    <p class="confirm-text">
+      Toàn bộ ứng dụng sẽ tắt hẳn (kể cả phiên đang đếm nếu có). Bạn cần bấm lại
+      file <b>run.bat</b> để mở lại lần sau.
+    </p>
+    <div class="draw-footer">
+      <button class="btn btn-ghost" id="cancelShutdownBtn">Huỷ</button>
+      <div class="tool-spacer"></div>
+      <button class="btn btn-danger" id="confirmShutdownBtn">Đồng ý, dừng ứng dụng</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== OVERLAY: ĐÃ DỪNG ỨNG DỤNG ===================== -->
+<div id="shutdownDoneOverlay" class="overlay overlay-solid hidden">
+  <div class="goodbye-box">
+    <img src="/static/img/pig-icon.png" alt="logo" class="goodbye-logo">
+    <h2>Đã dừng ứng dụng Pig Counter</h2>
+    <p>Bạn có thể đóng tab trình duyệt này lại.<br>Lần sau muốn dùng, chỉ cần bấm file <b>run.bat</b>.</p>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
