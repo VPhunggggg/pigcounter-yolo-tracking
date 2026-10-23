@@ -1,3 +1,5 @@
+![PigCounter — tracking & counting](docs/images/cover.png)
+
 <div align="center">
 
 # PigCounter
